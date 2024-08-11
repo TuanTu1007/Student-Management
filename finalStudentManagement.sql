@@ -1,0 +1,584 @@
+CREATE SCHEMA Student_Management;
+DROP SCHEMA Student_Management;
+USE Student_Management;
+
+CREATE TABLE signin(
+	MaID varchar(50) NOT NULL PRIMARY KEY,
+    username varchar(50) NOT NULL UNIQUE,
+    password varchar(50) NOT NULL
+);
+insert into signin(MaID, username, password) values ('1', 'admin', 'admin');
+
+CREATE TABLE HOCSINH(
+	MaHS VARCHAR(50) NOT NULL PRIMARY KEY,
+	TenHS NVARCHAR(255) NOT NULL, 
+	GioiTinh NVARCHAR(255) NOT NULL, 
+	NamSinh INT NOT NULL, 
+	DiaChi NVARCHAR(255) NOT NULL, 
+	Email VARCHAR(255) NOT NULL
+); 
+
+CREATE TABLE MON( 
+	MaMH VARCHAR(50) NOT NULL PRIMARY KEY, 
+	TenMH NVARCHAR(255) NOT NULL UNIQUE, 
+	HeSo INT NOT NULL
+); 
+
+CREATE TABLE BANGDIEMMON( 
+	MaBangDiemMon VARCHAR(50) NOT NULL PRIMARY KEY, 
+	MaNH VARCHAR(50) NOT NULL, 
+	MaLop VARCHAR(50) NOT NULL, 
+	MaMH VARCHAR(50) NOT NULL, 
+	MaHK VARCHAR(50) NOT NULL 
+); 
+
+CREATE TABLE HOCKY( 
+	MaHK VARCHAR(50) NOT NULL PRIMARY KEY, 
+	TenHK INT NOT NULL UNIQUE
+); 
+
+CREATE TABLE LOAIHINHKIEMTRA( 
+	MaLHKT VARCHAR(50) NOT NULL PRIMARY KEY, 
+	TenLHKT NVARCHAR(255) NOT NULL, 
+	HeSo INT NOT NULL
+); 
+
+CREATE TABLE CT_BANGDIEMMON_HS( 
+	MaCT_BangDiemMon VARCHAR(50) NOT NULL PRIMARY KEY, 
+	MaBangDiemMon VARCHAR(50) NOT NULL, 
+	MaHS VARCHAR(50) NOT NULL, 
+	DiemTBMon FLOAT
+); 
+
+CREATE TABLE CT_BANGDIEMMON_LHKT( 
+	MaCT_BangDiemMon VARCHAR(50) NOT NULL, 
+	MaLHKT VARCHAR(50) NOT NULL, 
+	Diem FLOAT NOT NULL,
+    primary key (MaCT_BangDiemMon, MaLHKT)
+); 
+
+CREATE TABLE NAMHOC( 
+	MaNH VARCHAR(50) NOT NULL PRIMARY KEY, 
+	NamHead INT NOT NULL, 
+	NamTail INT NOT NULL 
+); 
+
+CREATE TABLE QUATRINH( 
+	MaHS VARCHAR(50) NOT NULL, 
+	MaLop VARCHAR(50) NOT NULL, 
+	MaHK VARCHAR(50) NOT NULL, 
+	DiemTBHK FLOAT,
+    PRIMARY KEY (MaHS,MaLop,MaHK)
+); 
+
+CREATE TABLE LOP( 
+	MaLop VARCHAR(50) NOT NULL PRIMARY KEY, 
+	TenLop VARCHAR(255) NOT NULL UNIQUE, 
+	SiSo INT NOT NULL, 
+	MaKhoi VARCHAR(50) NOT NULL, 
+	MaNH VARCHAR(50) NOT NULL
+); 
+
+CREATE TABLE KHOI( 
+	MaKhoi VARCHAR(50) NOT NULL PRIMARY KEY, 
+	TenKhoi VARCHAR(255) NOT NULL UNIQUE
+); 
+
+CREATE TABLE BAOCAOTONGKETMON( 
+	MaBCTKM VARCHAR(50) NOT NULL PRIMARY KEY, 
+	MaMH VARCHAR(50) NOT NULL, 
+    MaHK VARCHAR(50) NOT NULL, 
+    MaNH VARCHAR(50) NOT NULL 
+); 
+
+CREATE TABLE CT_BCTKM( 
+	MaBCTKM VARCHAR(50) NOT NULL, 
+	MaLop VARCHAR(50) NOT NULL, 
+	SLDat INT, 
+	TiLe FLOAT,
+    PRIMARY KEY (MaBCTKM,MaLop)
+); 
+
+CREATE TABLE BAOCAOTONGKETHOCKY( 
+	MaHK VARCHAR(50) NOT NULL, 
+	MaNH VARCHAR(50) NOT NULL, 
+	MaLop VARCHAR(50) NOT NULL, 
+	SLDat INT, 
+	TiLe FLOAT,
+    PRIMARY KEY (MaHK,MaNH,MaLop)
+);
+
+CREATE TABLE THAMSO( 
+	TuoiHSToiDa int,
+    TuoiHSToiThieu int,
+    SoLuongHSToiDa int,
+    DiemToiDa int,
+    DiemToiThieu int,
+    DiemDat int,
+    ApDungKTQDD int
+);
+
+insert into thamso values (20, 15, 40, 10, 0, 5, 0);
+
+-- ------------------------------------------- TRIGGER ĐIỂM TỐI THIỂU TỐI ĐA
+DELIMITER //
+
+CREATE TRIGGER before_insert_CT_BANGDIEMMON_LHKT
+BEFORE INSERT ON CT_BANGDIEMMON_LHKT
+FOR EACH ROW
+BEGIN
+    DECLARE DiemToiThieu INT;
+    DECLARE DiemToiDa INT;
+    SELECT DiemToiThieu INTO DiemToiThieu FROM THAMSO;
+    SELECT DiemToiDa INTO DiemToiDa FROM THAMSO;
+    
+    IF (NEW.Diem < 0 OR NEW.Diem > 10 OR NEW.Diem < DiemToiThieu OR NEW.Diem > DiemToiDa) THEN
+        SET @msg = CONCAT('Diem loi');
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = @msg;
+    END IF;
+END//
+
+DELIMITER ;
+
+-- ------------------------------------------- TRIGGER THAY ĐỔI SĨ SỐ LỚP
+SET SQL_SAFE_UPDATES = 0;
+update thamso set SoLuongHSToiDa = 40;
+insert into THAMSO values (20, 15, 40, 10, 0, 5, 0);
+
+DELIMITER //
+CREATE TRIGGER UpdateSiSo AFTER UPDATE ON THAMSO FOR EACH ROW
+BEGIN
+    UPDATE LOP
+    SET SiSo = NEW.SoLuongHSToiDa;
+END;
+//
+DELIMITER ;
+
+
+
+DELIMITER //
+CREATE TRIGGER before_insert_lop
+BEFORE INSERT ON LOP
+FOR EACH ROW
+BEGIN
+    DECLARE max_students INT;
+
+    SELECT SoLuongHSToiDa INTO max_students
+    FROM thamso;
+
+    IF NEW.SiSo > max_students THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Số lượng học sinh vượt quá giới hạn cho phép';
+    END IF;
+END;
+//
+DELIMITER ;
+-- ----------------------------------------------------------------------------------------------
+
+-- FOREIGN KEY
+
+ALTER TABLE BANGDIEMMON ADD CONSTRAINT FK_BANGDIEMMON_LOP FOREIGN KEY (MaLop) REFERENCES LOP(MaLop) ON DELETE CASCADE;
+ALTER TABLE BANGDIEMMON ADD CONSTRAINT FK_BANGDIEMMON_NAMHOC FOREIGN KEY (MaNH) REFERENCES NAMHOC(MaNH);
+ALTER TABLE BANGDIEMMON ADD CONSTRAINT FK_BANGDIEMMON_HOCKY FOREIGN KEY (MaHK) REFERENCES HOCKY(MaHK);
+ALTER TABLE BANGDIEMMON ADD CONSTRAINT FK_BANGDIEMMON_MONHOC FOREIGN KEY (MaMH) REFERENCES MON(MaMH) ON DELETE CASCADE;
+
+ALTER TABLE CT_BANGDIEMMON_HS ADD CONSTRAINT FK_CT_BANGDIEMMON_HS_BANGDIEMMON FOREIGN KEY (MaBangDiemMon) REFERENCES BANGDIEMMON(MaBangDiemMon);
+ALTER TABLE CT_BANGDIEMMON_HS ADD CONSTRAINT FK_CT_BANGDIEMMON_HS_HOCSINH FOREIGN KEY (MaHS) REFERENCES HOCSINH(MaHS);
+
+ALTER TABLE CT_BANGDIEMMON_LHKT ADD CONSTRAINT FK_CT_BANGDIEMMON_LHKT_LOAIHINHKIEMTRA FOREIGN KEY (MaLHKT) REFERENCES LOAIHINHKIEMTRA(MaLHKT);
+ALTER TABLE CT_BANGDIEMMON_LHKT ADD CONSTRAINT FK_CT_BANGDIEMMON_LHKT_CT_BANGDIEMMON_HS FOREIGN KEY (MaCT_BangDiemMon) REFERENCES CT_BANGDIEMMON_HS(MaCT_BangDiemMon);
+
+ALTER TABLE QUATRINH ADD CONSTRAINT FK_QUATRINH_HOCSINH FOREIGN KEY (MaHS) REFERENCES HOCSINH(MaHS);
+ALTER TABLE QUATRINH ADD CONSTRAINT FK_QUATRINH_LOP FOREIGN KEY (MaLop) REFERENCES LOP(MaLop) ON DELETE CASCADE;
+ALTER TABLE QUATRINH ADD CONSTRAINT FK_QUATRINH_HOCKY FOREIGN KEY (MaHK) REFERENCES HOCKY(MaHK);
+
+ALTER TABLE LOP ADD CONSTRAINT FK_LOP_KHOI FOREIGN KEY (MaKhoi) REFERENCES KHOI(MaKhoi);
+ALTER TABLE LOP ADD CONSTRAINT FK_LOP_NAMHOC FOREIGN KEY (MaNH) REFERENCES NAMHOC(MaNH);
+
+ALTER TABLE BAOCAOTONGKETMON ADD CONSTRAINT FK_BAOCAOTONGKETMON_MONHOC FOREIGN KEY (MaMH) REFERENCES MON(MaMH) ON DELETE CASCADE;
+ALTER TABLE BAOCAOTONGKETMON ADD CONSTRAINT FK_BAOCAOTONGKETMON_HOCKY FOREIGN KEY (MaHK) REFERENCES HOCKY(MaHK);
+ALTER TABLE BAOCAOTONGKETMON ADD CONSTRAINT FK_BAOCAOTONGKETMON_NAMHOC FOREIGN KEY (MaNH) REFERENCES NAMHOC(MaNH);
+
+ALTER TABLE CT_BCTKM ADD CONSTRAINT FK_CT_BCTKM_BAOCAOTONGKETMON FOREIGN KEY (MaBCTKM) REFERENCES BAOCAOTONGKETMON(MaBCTKM);
+ALTER TABLE CT_BCTKM ADD CONSTRAINT FK_CT_BCTKM_LOP FOREIGN KEY (MaLop) REFERENCES LOP(MaLop) ON DELETE CASCADE;
+
+ALTER TABLE BAOCAOTONGKETHOCKY ADD CONSTRAINT FK_BAOCAOTONGKETHOCKY_LOP FOREIGN KEY (MaLop) REFERENCES LOP(MaLop) ON DELETE CASCADE;
+ALTER TABLE BAOCAOTONGKETHOCKY ADD CONSTRAINT FK_BAOCAOTONGKETHOCKY_NAMHOC FOREIGN KEY (MaNH) REFERENCES NAMHOC(MaNH);
+ALTER TABLE BAOCAOTONGKETHOCKY ADD CONSTRAINT FK_BAOCAOTONGKETHOCKY_HOCKY FOREIGN KEY (MaHK) REFERENCES HOCKY(MaHK);
+-- DELETE FROM LOP WHERE MaLop = 'L1';
+-- Ràng buộc miền giá trị
+-- 1,2
+ALTER TABLE HOCSINH ADD CONSTRAINT CHECK_GIOITINH CHECK (GioiTinh = "Nam" OR GioiTinh = "Nữ");
+    
+-- 3,4
+ALTER TABLE MON ADD CONSTRAINT CHK_HeSo CHECK (HeSo IN (1, 2));
+ALTER TABLE HOCKY ADD CONSTRAINT CHK_TenHK CHECK (TenHK IN (1, 2));
+
+-- 5,6 
+ALTER TABLE LOAIHINHKIEMTRA ADD CONSTRAINT CONSTRAINT_LOAIHINHKIEMTRA CHECK (HeSo=1 OR HeSo=2 OR HeSo=3);
+ALTER TABLE NAMHOC ADD CONSTRAINT CONSTRAINT_NAMHOC CHECK (NamHead < NamTail);
+
+-- 7,8
+ALTER TABLE LOP ADD CONSTRAINT CHECK_SL_HS CHECK (SiSo <= 40);
+
+
+-- Qui định 1: Thay đổi tuổi tối thiểu, tuổi tối đa
+-- Xử lý lớp giữa
+
+-- Ràng buộc tham chiếu
+-- Xóa sinh viên sẽ xóa hết các thông tin liên quan
+DELIMITER //
+CREATE PROCEDURE PROC_DELETE_RELATED_INFO(IN p_MaHS VARCHAR(50)) 
+BEGIN
+    DELETE FROM CT_BANGDIEMMON_HS WHERE MaHS = p_MaHS;
+    DELETE FROM QUATRINH WHERE MaHS = p_MaHS;
+END;
+//
+DELIMITER ;
+
+DELIMITER //
+CREATE TRIGGER TRIGGER_DELETE_STUDENT_INFO
+BEFORE DELETE ON HOCSINH
+FOR EACH ROW
+BEGIN
+    CALL DELETE_RELATED_INFO(OLD.MaHS);
+END;
+//
+DELIMITER ;
+
+-- Ràng buộc liên quan hệ
+-- 1 Mỗi bảng điểm môn phải có ít nhất một chi tiết bảng điểm môn học sinh
+DELIMITER //
+
+CREATE TRIGGER TRIGGER_DELETE_CT_BANGDIEMMON_HS_BANGDIEMMON_HS
+BEFORE DELETE ON CT_BANGDIEMMON_HS
+FOR EACH ROW
+BEGIN
+    DECLARE count_details INT;
+
+    SELECT COUNT(*) INTO count_details
+    FROM BANGDIEMMON
+    WHERE BANGDIEMMON.MaBangDiemMon = OLD.MaBangDiemMon;
+
+    IF count_details < 1 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Mỗi bảng điểm môn phải có ít nhất một chi tiết bảng điểm môn học sinh';
+    END IF;
+END;
+//
+DELIMITER ;
+
+-- update BANGDIEMMON
+DELIMITER //
+
+CREATE TRIGGER TRIGGER_UPDATE_BANGDIEMMON_CT_BANGDIEMMON_HS
+BEFORE UPDATE ON BANGDIEMMON
+FOR EACH ROW
+BEGIN
+    DECLARE count_details INT;
+
+    SELECT COUNT(*) INTO count_details
+    FROM CT_BANGDIEMMON_HS
+    WHERE CT_BANGDIEMMON_HS.MaBangDiemMon = NEW.MaBangDiemMon;
+
+    IF count_details < 1 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Mỗi bảng điểm môn phải có ít nhất một chi tiết bảng điểm môn học sinh';
+    END IF;
+END;
+//
+
+DELIMITER ;
+
+-- update CT_BANGDIEMMON_HS
+
+DELIMITER //
+
+CREATE TRIGGER TRIGGER_UPDATE_CT_BANGDIEMMON_HS_BANGDIEMMON
+BEFORE UPDATE ON CT_BANGDIEMMON_HS
+FOR EACH ROW
+BEGIN
+    DECLARE count_details INT;
+
+    SELECT COUNT(*) INTO count_details
+    FROM BANGDIEMMON
+    WHERE BANGDIEMMON.MaBangDiemMon = NEW.MaBangDiemMon;
+
+    IF count_details < 1 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Mỗi bảng điểm môn phải có ít nhất một chi tiết bảng điểm môn học sinh';
+    END IF;
+END;
+//
+DELIMITER ;
+
+
+-- 2. Mỗi bảng điểm môn học sinh phải có ít nhất một chi tiết bảng điểm môn loại hình kiểm tra
+-- Xóa ở table CT_BANGDIEMMON_LHKT
+
+DELIMITER //
+
+CREATE TRIGGER TRIGGER_BANGDIEMMON_LHKT_DELETE
+BEFORE DELETE ON CT_BANGDIEMMON_LHKT
+FOR EACH ROW
+BEGIN
+    DECLARE count_details INT;
+
+    SELECT COUNT(*) INTO count_details
+    FROM CT_BANGDIEMMON_HS
+    WHERE MaCT_BangDiemMon = OLD.MaCT_BangDiemMon;
+
+    IF count_details < 1 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Mỗi bảng điểm môn học sinh phải có ít nhất một chi tiết bảng điểm môn loại hình kiểm tra';
+    END IF;
+END;
+//
+-- update CT_BANGDIEMMON_LHKT
+
+DELIMITER //
+
+CREATE TRIGGER TRIGGER_BANGDIEMMON_LHKT_UPDATE
+BEFORE UPDATE ON CT_BANGDIEMMON_LHKT
+FOR EACH ROW
+BEGIN
+    DECLARE count_details INT;
+
+    SELECT COUNT(*) INTO count_details
+    FROM CT_BANGDIEMMON_HS
+    WHERE MaCT_BangDiemMon = NEW.MaCT_BangDiemMon;
+
+    IF count_details < 1 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Mỗi bảng điểm môn học sinh phải có ít nhất một chi tiết bảng điểm môn loại hình kiểm tra';
+    END IF;
+END;
+//
+
+DELIMITER ;
+
+-- update CT_BANGDIEMMON_HS
+
+DELIMITER //
+
+CREATE TRIGGER TRIGGER_BANGDIEMMON_HS_UPDATE
+BEFORE UPDATE ON CT_BANGDIEMMON_HS
+FOR EACH ROW
+BEGIN
+    DECLARE count_details INT;
+
+    SELECT COUNT(*) INTO count_details
+    FROM CT_BANGDIEMMON_LHKT
+    WHERE MaCT_BangDiemMon = NEW.MaCT_BangDiemMon;
+
+    IF count_details < 1 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Mỗi bảng điểm môn học sinh phải có ít nhất một chi tiết bảng điểm môn loại hình kiểm tra';
+    END IF;
+END;
+//
+DELIMITER ;
+
+-- Liên quan hệ
+-- 3 Mỗi bảng báo cáo tổng kết môn phải có ít nhất một chi tiết báo cáo tổng kết môn
+DELIMITER //
+CREATE TRIGGER check_min_one_TKM_CT
+BEFORE DELETE ON CT_BCTKM
+FOR EACH ROW
+BEGIN
+    DECLARE process_count INT;
+    
+    SELECT COUNT(*) INTO process_count
+    FROM BAOCAOTONGKETMON
+    WHERE MaBCTKM = OLD.MaBCTKM;
+    
+    IF process_count < 1 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Mỗi bảng báo cáo tổng kết môn phải có ít nhất một chi tiết báo cáo tổng kết môn.';
+    END IF;
+END;
+//
+DELIMITER ;
+
+-- 4 Mỗi học sinh phải có ít nhất 1 bảng quá trình học
+DELIMITER //
+CREATE TRIGGER check_min_one_HOCSINH_QUATRINH
+BEFORE DELETE ON QUATRINH
+FOR EACH ROW
+BEGIN
+    DECLARE process_count INT;
+    
+    SELECT COUNT(*) INTO process_count
+    FROM HOCSINH
+    WHERE MaHS = OLD.MaHS;
+    
+    IF process_count < 1 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Mỗi học sinh phải có ít nhất một bảng quá trình học.';
+    END IF;
+END;
+//
+DELIMITER ;
+
+-- STORED PROCEDURE
+-- 1. Tính điểm trung bình môn (DiemTBMon)
+
+DELIMITER $$
+CREATE PROCEDURE PROC_AVG_MON(IN maCT_BDM VARCHAR(50), OUT DTBM FLOAT)
+BEGIN
+    DECLARE DIEM FLOAT;
+    DECLARE soLuongDiemKhongHeSo INT;
+
+    SELECT COUNT(*) INTO soLuongDiemKhongHeSo
+    FROM CT_BANGDIEMMON_LHKT
+    WHERE MaCT_BangDiemMon = maCT_BDM AND NOT EXISTS (
+        SELECT 1
+        FROM LOAIHINHKIEMTRA
+        WHERE LOAIHINHKIEMTRA.MaLHKT = CT_BANGDIEMMON_LHKT.MaLHKT AND LOAIHINHKIEMTRA.HeSo IS NOT NULL
+    );
+
+    IF soLuongDiemKhongHeSo > 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Cần cho biết hệ số của cột điểm hiện tại của các môn';
+    ELSE
+        SELECT SUM(LOAIHINHKIEMTRA.HeSo * CT_BANGDIEMMON_LHKT.Diem) / SUM(LOAIHINHKIEMTRA.HeSo) INTO DIEM
+        FROM LOAIHINHKIEMTRA, CT_BANGDIEMMON_HS, CT_BANGDIEMMON_LHKT
+        WHERE CT_BANGDIEMMON_HS.MaCT_BangDiemMon = CT_BANGDIEMMON_LHKT.MaCT_BangDiemMon
+        AND LOAIHINHKIEMTRA.MaLHKT = CT_BANGDIEMMON_LHKT.MaLHKT
+        AND maCT_BDM = CT_BANGDIEMMON_HS.MaCT_BangDiemMon;
+		SELECT DIEM AS DIEM;
+        IF DIEM IS NOT NULL THEN
+            SET DTBM = DIEM;
+            UPDATE CT_BANGDIEMMON_HS
+            SET DiemTBMon = DTBM
+            WHERE MaCT_BangDiemMon = maCT_BDM;
+        END IF;
+    END IF;
+END $$
+
+-- 2. Tính điểm trung bình học kì (DiemTBHK)
+DELIMITER $$
+
+CREATE PROCEDURE TinhDiemTBHK(
+    IN p_MaHS VARCHAR(50),
+    IN p_MaLop VARCHAR(50),
+    IN p_MaHK VARCHAR(50),
+    OUT p_DiemTBHK FLOAT
+)
+BEGIN
+    DECLARE totalWeight FLOAT DEFAULT 0;
+    DECLARE totalGradePoints FLOAT DEFAULT 0;
+    
+    -- Tính tổng hệ số của các môn học
+    SELECT SUM(m.HeSo) 
+    INTO totalWeight
+    FROM MON m
+    JOIN BANGDIEMMON bd ON m.MaMH = bd.MaMH
+    JOIN CT_BANGDIEMMON_HS ct ON bd.MaBangDiemMon = ct.MaBangDiemMon
+    WHERE ct.MaHS = p_MaHS AND bd.MaLop = p_MaLop AND bd.MaHK = p_MaHK;
+
+    -- Tính tổng điểm tích lũy theo hệ số
+    SELECT SUM(ct.DiemTBMon * m.HeSo) 
+    INTO totalGradePoints
+    FROM CT_BANGDIEMMON_HS ct
+    JOIN BANGDIEMMON bd ON ct.MaBangDiemMon = bd.MaBangDiemMon
+    JOIN MON m ON bd.MaMH = m.MaMH
+    WHERE ct.MaHS = p_MaHS AND bd.MaLop = p_MaLop AND bd.MaHK = p_MaHK;
+
+    -- Tính điểm trung bình học kỳ
+    IF totalWeight > 0 THEN
+        SET p_DiemTBHK = totalGradePoints / totalWeight;
+    ELSE
+        SET p_DiemTBHK = 0;
+    END IF;
+    
+    -- Cập nhật điểm trung bình học kỳ vào bảng QUATRINH
+    UPDATE QUATRINH 
+    SET DiemTBHK = p_DiemTBHK
+    WHERE MaHS = p_MaHS
+    AND MaLop = p_MaLop
+    AND MaHK = p_MaHK;
+    
+END$$
+
+DELIMITER ;
+
+drop procedure TinhDiemTBHK;
+
+-- -------------------------------------------------------- ĐÃ CHẠY
+-- cau 3 Tu lam
+DELIMITER $$
+CREATE PROCEDURE CalculatePassRateAndRatioSubject (
+    IN p_MaBCTKM VARCHAR(50),
+    IN p_MaLop VARCHAR(50),
+    IN p_MaMH VARCHAR(50),
+    IN p_MaHK VARCHAR(50),
+    OUT p_SLDat INT,
+    OUT p_TiLe FLOAT
+) 
+BEGIN
+    DECLARE TotalStudents INT; 
+    DECLARE PassedStudents INT;
+    DECLARE PassRatio FLOAT;
+    DECLARE p_DiemDat INT; --
+    
+    SELECT DiemDat INTO p_DiemDat FROM THAMSO;
+    
+    -- Tính tổng số học sinh
+    SELECT SiSo INTO TotalStudents FROM LOP WHERE MaLop = p_MaLop;
+    
+    -- Tính số học sinh đạt 
+    SELECT COUNT(BDM.MaLop) INTO PassedStudents
+    FROM CT_BANGDIEMMON_HS CT, BANGDIEMMON BDM
+    WHERE CT.DiemTBMon >= p_DiemDat AND BDM.MaBangDiemMon = CT.MaBangDiemMon 
+		AND BDM.MaLop = p_MaLop AND BDM.MaMH = p_MaMH AND BDM.MaHK = p_MaHK
+    GROUP BY BDM.MaMH;
+    
+    -- Tính tỉ lệ đạt
+    SET PassRatio = PassedStudents  / TotalStudents;
+    
+    -- Cập nhật số lượng đạt và tỉ lệ vào bảng CT_BCTKM
+    UPDATE CT_BCTKM ct, BAOCAOTONGKETMON bctkm
+    SET ct.SLDat = PassedStudents, ct.TiLe = PassRatio
+    WHERE ct.MaBCTKM = p_MaBCTKM AND ct.MaLop = p_MaLop AND bctkm.MaMH = p_MaMH AND bctkm.MaHK = p_MaHK AND ct.MaBCTKM = bctkm.MaBCTKM;
+    
+    -- Trả về kết quả
+    SELECT MaMH, MaLop, SLDat, TiLe FROM CT_BCTKM ct, BAOCAOTONGKETMON bctkm
+    WHERE ct.MaBCTKM = bctkm.MaBCTKM AND ct.MaBCTKM = p_MaBCTKM AND ct.MaLop = p_MaLop AND bctkm.MaMH = p_MaMH AND bctkm.MaHK = p_MaHK;
+END$$
+DELIMITER ;
+
+-- Cau 4
+DELIMITER $$
+CREATE PROCEDURE CalculatePassRateAndRatioSemester (
+	IN P_MaHK VARCHAR(50),
+    IN p_MaLop VARCHAR(50),
+	IN p_MaNH VARCHAR(50),
+    OUT sldat INT,
+	OUT passratio FLOAT
+)
+BEGIN    
+	DECLARE siso INT;
+    DECLARE p_DiemDat INT; --
+    
+    SELECT DiemDat INTO p_DiemDat FROM THAMSO;
+    -- Tính tổng số học sinh
+    SELECT LOP.SiSo INTO siso
+	FROM LOP, BAOCAOTONGKETHOCKY bchk
+	WHERE bchk.MaLop = LOP.MaLop AND LOP.MaLop = p_MaLop AND bchk.MaHK = p_MaHK;
+    
+    -- Tính số học sinh đạt (giả sử điểm trung bình học kỳ >= 5 là đạt)
+    SELECT COUNT(LOP.MaLop) INTO sldat
+	FROM QUATRINH, LOP, BAOCAOTONGKETHOCKY bchk
+	WHERE QUATRINH.DiemTBHK >= p_DiemDat AND QUATRINH.MaLop = LOP.MaLop AND bchk.MaLop = QUATRINH.MaLop AND bchk.MaLop = LOP.MaLop AND LOP.MaLop = p_MaLop AND bchk.MaHK = p_MaHK
+	GROUP BY bchk.MaHK, LOP.MaLop;
+    
+    -- Tính tỉ lệ đạt
+    SET passratio = sldat / siso;
+    
+    -- Cập nhật vào bảng BAOCAOTONGKETHOCKY
+    UPDATE BAOCAOTONGKETHOCKY
+    SET SLDat = sldat, TiLe = passratio
+    WHERE MaHK = p_MaHK AND MaNH = p_MaNH AND MaLop = p_MaLop;
+END$$
+DELIMITER ;
